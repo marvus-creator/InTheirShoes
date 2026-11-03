@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>In Their Shoes</title>
+  <meta name="description" content="A short story game about empathy: react to a moment at school, then live the same moment as the other person.">
+  <meta name="theme-color" content="#1d1a16">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@500;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app" class="app">
+    <div class="bg show" id="bg-a"></div>
+    <div class="bg" id="bg-b"></div>
+    <div class="tint" id="tint"></div>
+
+    <header class="hud" id="hud" hidden>
+      <div class="hud-left">
+        <span class="chapter-label" id="chapter-label"></span>
+        <span class="time" id="time"></span>
+      </div>
+      <div class="shoes" id="shoes" hidden></div>
+      <div class="hud-right">
+        <button type="button" class="pill" id="sound" aria-pressed="false">Sound on</button>
+        <button type="button" class="pill" id="menu">Menu</button>
+      </div>
+    </header>
+
+    <div class="cast" id="cast" aria-live="off"></div>
+
+    <section class="box" id="box" hidden aria-live="polite">
+      <span class="tag" id="tag"></span>
+      <p class="text" id="text"></p>
+      <div class="choices" id="choices"></div>
+      <span class="hint" id="hint" aria-hidden="true">Tap or press Space</span>
+    </section>
+
+    <div class="overlay" id="overlay"></div>
+  </main>
+  <script src="js/story.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
