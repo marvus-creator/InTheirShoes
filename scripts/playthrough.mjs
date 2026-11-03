@@ -24,9 +24,16 @@ async function shot(label) {
   writeFileSync(file, Buffer.from(data, 'base64'));
 }
 
-await shot('title');
+await shot('welcome');
 await page.fill('#name', 'Aline');
 await page.click$('form .btn');
+await page.waitFor(`!document.querySelector('#shell').hidden && document.querySelector('.hero')`);
+await new Promise((r) => setTimeout(r, 700));
+await shot('dashboard-empty');
+await page.click$('.mood[data-mood="happy"]');
+await new Promise((r) => setTimeout(r, 500));
+await page.click$('[data-play="0"]');
+await page.waitFor(`!document.querySelector('#app').hidden`);
 
 const probe = `(() => {
   const o = document.querySelector('#overlay');
@@ -37,7 +44,7 @@ const probe = `(() => {
   const box = document.querySelector('#box');
   const hint = document.querySelector('#hint').classList.contains('show');
   return {
-    kind: fin ? 'finale' : opts.length ? 'judge' : go ? (o.className.includes('switching') ? 'switch' : o.className.includes('returning') ? 'return' : o.querySelector('.reveal') ? 'reveal' : 'card') : ch.length ? 'choice' : !box.hidden ? (hint ? 'line' : 'typing') : 'idle',
+    kind: o.querySelector('[data-next]') ? 'next' : o.querySelector('[data-journal]') ? 'complete' : fin ? 'finale' : opts.length ? 'judge' : go ? (o.className.includes('switching') ? 'switch' : o.className.includes('returning') ? 'return' : o.querySelector('.reveal') ? 'reveal' : 'card') : ch.length ? 'choice' : !box.hidden ? (hint ? 'line' : 'typing') : 'idle',
     n: opts.length || ch.length,
     chapter: document.querySelector('#chapter-label').textContent,
     time: document.querySelector('#time').textContent,
@@ -54,14 +61,15 @@ for (;;) {
   if (++steps > 900) throw new Error('playthrough did not finish');
   const s = await page.evaluate(probe);
   const sig = `${s.chapter}|${s.kind}|${s.time}`;
-  if (['judge', 'switch', 'return', 'reveal', 'card', 'choice', 'finale'].includes(s.kind) || (s.kind === 'line' && !seen.has(sig))) {
-    if (!seen.has(sig) || s.kind === 'finale') {
+  if (['judge', 'switch', 'return', 'reveal', 'card', 'choice', 'next', 'complete'].includes(s.kind) || (s.kind === 'line' && !seen.has(sig))) {
+    if (!seen.has(sig)) {
       seen.add(sig);
       await new Promise((r) => setTimeout(r, s.kind === 'line' ? 200 : 900));
       await shot(`${s.chapter.split(' · ')[0] || 'x'}-${s.kind}`.replace(/\W+/g, '-'));
     }
   }
-  if (s.kind === 'finale') break;
+  if (s.kind === 'complete') { await page.evaluate(`document.querySelector('[data-journal]').click()`); break; }
+  if (s.kind === 'next') { await page.evaluate(`document.querySelector('[data-next]').click()`); await new Promise((r) => setTimeout(r, 600)); continue; }
   if (s.kind === 'judge') await page.evaluate(`document.querySelectorAll('#overlay .option')[${pick} % ${s.n}].click()`);
   else if (['switch', 'return', 'reveal', 'card'].includes(s.kind)) await page.evaluate(`document.querySelector('#overlay [data-go]').click()`);
   else if (s.kind === 'choice') { log.push(`choice: ${s.tag}`); await page.evaluate(`document.querySelectorAll('.choice')[${pick} % ${s.n}].click()`); }
@@ -70,10 +78,20 @@ for (;;) {
   await new Promise((r) => setTimeout(r, s.kind === 'typing' ? 60 : 450));
 }
 
-await page.evaluate(`document.querySelector('[data-teach]').click(), true`);
-await new Promise((r) => setTimeout(r, 900));
-await shot('teachers');
+await page.waitFor(`!document.querySelector('#shell').hidden && document.querySelector('.jcard')`);
+await new Promise((r) => setTimeout(r, 700));
+await shot('journal');
 const journal = await page.evaluate(`document.querySelectorAll('.jcard').length`);
+await page.fill('#note', 'Ask Kevin to sit with us');
+await page.click$('#save-note');
+for (const v of ['home', 'stories', 'checkin', 'teachers', 'settings']) {
+  await page.evaluate(`document.querySelector('[data-view="${v}"]').click(), true`);
+  await new Promise((r) => setTimeout(r, 700));
+  await shot(v);
+}
+const notes = await page.evaluate(`JSON.parse(localStorage.getItem('its:progress')).notes.length`);
+const checkins = await page.evaluate(`JSON.parse(localStorage.getItem('its:progress')).checkins.length`);
+console.log(`notes: ${notes}, checkins: ${checkins}`);
 const stored = await page.evaluate(`localStorage.getItem('its:progress')`);
 console.log(`lines/choices: ${log.length}, journal cards: ${journal}, shots: ${n}`);
 console.log(`stored: ${stored ? JSON.parse(stored).done.join(',') : 'none'}`);

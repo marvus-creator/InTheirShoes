@@ -17,7 +17,7 @@ const store = {
   },
 };
 
-const state = { name: '', vars: {}, journal: [], shoes: null, cast: [], chapter: 0, muted: false };
+const state = { name: '', vars: {}, journal: [], shoes: null, cast: [], chapter: 0, muted: false, speed: 'fast' };
 
 const ui = {
   app: $('#app'),
@@ -90,6 +90,7 @@ ui.app.addEventListener('click', (e) => {
   advance();
 });
 addEventListener('keydown', (e) => {
+  if (ui.app.hidden) return;
   if (e.target.closest?.('input, textarea')) return;
   if (e.key === ' ' || e.key === 'Enter') {
     if (document.activeElement?.tagName === 'BUTTON') return;
@@ -182,7 +183,7 @@ async function line(kind, who, raw) {
   let done = false;
   await new Promise((res) => {
     let i = 0;
-    const speed = reduced ? 0 : 11;
+    const speed = reduced ? 0 : ({ normal: 16, fast: 7, instant: 0 })[state.speed] ?? 7;
     onAdvance = () => { done = true; };
     const tick = () => {
       if (done || speed === 0) i = full.length;
@@ -325,7 +326,7 @@ async function chapterCard(n, ch) {
   await closeOverlay();
 }
 
-async function step(b, ch) {
+async function step(b, ch, token) {
   if (b.bg) return setScene(b.bg, b.chalk, b.time);
   if (b.time) return setTime(b.time);
   if (b.cast) return setCast(b.cast);
@@ -339,135 +340,105 @@ async function step(b, ch) {
   if (b.choose) {
     const i = await choose(b.choose);
     if (b.save) state.vars[b.save] = { i, text: b.choose[i].text };
-    return run(b.choose[i].then ?? [], ch);
+    return run(b.choose[i].then ?? [], ch, token);
   }
   if (b.judge) {
     const i = await judge(b.judge);
     state.vars[b.save] = { i, text: b.judge.options[i] };
     return;
   }
-  if (b.when) return run(b.cases[state.vars[b.when]?.i ?? 0] ?? [], ch);
+  if (b.when) return run(b.cases[state.vars[b.when]?.i ?? 0] ?? [], ch, token);
   if (b.switch) return flipTo(b.switch, b.text);
   if (b.back) return flipTo(null, b.text);
   if (b.card) return revealCard(b.card, ch);
 }
 
-async function run(beats, ch) {
-  for (const b of beats) await step(b, ch);
+let session = 0;
+const ABORT = Symbol('abort');
+
+async function run(beats, ch, token) {
+  for (const b of beats) {
+    if (token !== session) throw ABORT;
+    await step(b, ch, token);
+  }
 }
 
 async function playChapter(n) {
+  const token = ++session;
   const ch = CHAPTERS[n];
   state.chapter = n;
+  state.vars = {};
   state.shoes = null;
   ui.app.classList.remove('in-shoes');
   ui.shoes.hidden = true;
   ui.hud.hidden = false;
   setCast([]);
   ui.box.hidden = true;
-  await chapterCard(n, ch);
-  await run(ch.you, ch);
-  await run(ch.them, ch);
-  await run(ch.back, ch);
+  try {
+    await chapterCard(n, ch);
+    await run(ch.you, ch, token);
+    await run(ch.them, ch, token);
+    await run(ch.back, ch, token);
+  } catch (e) {
+    if (e === ABORT) return;
+    throw e;
+  }
   ui.box.hidden = true;
   setCast([]);
   const prog = store.get();
   prog.done = [...new Set([...(prog.done ?? []), ch.id])];
   prog.journal = state.journal;
-  prog.name = state.name;
   store.set(prog);
-  if (n + 1 < CHAPTERS.length) return playChapter(n + 1);
-  finale();
-}
-
-function finale() {
-  ui.hud.hidden = true;
-  ui.box.hidden = true;
-  setScene('yard', '', '');
-  const cards = CHAPTERS.map((ch) => state.journal.find((j) => j.title === ch.title)).filter(Boolean);
+  const next = CHAPTERS.findIndex((c, i) => i !== n && !prog.done.includes(c.id));
+  const card = state.journal.find((j) => j.title === ch.title);
+  const p = PEOPLE[ch.other];
   const o = overlay(`
-    <div class="finale">
-      <p class="eyebrow">Your empathy journal</p>
-      <h1>Three stories. Three other sides.</h1>
-      <div class="journal">
-        ${cards.map((c) => `
-          <article class="jcard" style="--c:${PEOPLE[c.other].color}">
-            <div class="jface">${face(PEOPLE[c.other], 'happy')}</div>
-            <p class="skill">${c.skill}</p>
-            <h3>${c.title}</h3>
-            <p class="was ${c.open ? 'open' : ''}">${c.open ? 'You stayed open' : 'You thought'}: “${c.thought}”</p>
-            <p class="truth">${c.truth}</p>
-            <p class="lesson">${c.lesson}</p>
-          </article>`).join('')}
-      </div>
-      <div class="ask">
-        <h2>In real life you can’t switch into someone’s shoes. But you can ask.</h2>
-        <label for="reflect">Who might need a second look from you this week? Write it for yourself. Nothing here is sent anywhere.</label>
-        <textarea id="reflect" rows="2" placeholder="Someone I could ask…"></textarea>
-      </div>
+    <div class="sheet complete" style="--c:${p.color}">
+      <div class="jface big">${face(p, 'happy')}</div>
+      <p class="eyebrow">Story complete · ${ch.skill}</p>
+      <h2>${ch.title}</h2>
+      <p class="lesson">${card?.lesson ?? ''}</p>
+      <p class="saved">Saved to your journal</p>
       <div class="actions">
-        <button class="btn" data-again>Play again</button>
-        <button class="btn ghost" data-teach>For teachers</button>
+        ${next >= 0 ? `<button class="btn" data-next>Next: ${CHAPTERS[next].title}</button>` : `<button class="btn" data-journal>Open my journal</button>`}
+        <button class="btn ghost" data-home>Back to dashboard</button>
       </div>
-      <section class="teach" hidden>
-        <h2>Talk about it together</h2>
-        ${CHAPTERS.map((ch) => `<div><h3>${ch.title} <span>${ch.skill}</span></h3><ul>${ch.discuss.map((q) => `<li>${q}</li>`).join('')}</ul></div>`).join('')}
-      </section>
-    </div>`, 'paper scroll');
-  o.querySelector('[data-again]').addEventListener('click', () => { sfx.pick(); closeOverlay().then(title); });
-  o.querySelector('[data-teach]').addEventListener('click', () => {
-    const t = o.querySelector('.teach');
-    t.hidden = !t.hidden;
-    if (!t.hidden) t.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
-  });
+    </div>`, 'paper');
+  o.querySelector('[data-next]')?.addEventListener('click', () => { sfx.pick(); closeOverlay().then(() => playChapter(next)); });
+  o.querySelector('[data-journal]')?.addEventListener('click', () => { sfx.pick(); exitStory('journal'); });
+  o.querySelector('[data-home]').addEventListener('click', () => { sfx.pick(); exitStory('home'); });
 }
 
-function title() {
-  const prog = store.get();
-  state.vars = {};
-  state.journal = prog.journal ?? [];
-  state.shoes = null;
-  ui.app.classList.remove('in-shoes');
-  ui.hud.hidden = true;
+let onExit = () => {};
+function exitStory(view) {
+  session += 1;
+  onAdvance = null;
+  ui.overlay.className = 'overlay';
+  ui.overlay.innerHTML = '';
   ui.box.hidden = true;
   setCast([]);
-  setScene('home', '', '');
-  const done = new Set(prog.done ?? []);
-  const o = overlay(`
-    <div class="start">
-      <div class="faces">${['eric', 'grace', 'kevin'].map((id, i) => `<span style="--i:${i};--c:${PEOPLE[id].color}">${face(PEOPLE[id], ['tired', 'laugh', 'worried'][i])}</span>`).join('')}</div>
-      <p class="eyebrow">A short game about the other side of the story</p>
-      <h1>In Their Shoes</h1>
-      <p class="sub">Three moments at school. You react. Then you live the same moment as the other person.</p>
-      <form class="name">
-        <label for="name">What should we call you?</label>
-        <div class="row"><input id="name" maxlength="16" autocomplete="off" placeholder="Your first name" value="${(prog.name ?? '').replace(/"/g, '')}" required><button class="btn">Start</button></div>
-      </form>
-      <ol class="chapters">${CHAPTERS.map((ch, i) => `<li class="${done.has(ch.id) ? 'done' : ''}"><button type="button" data-ch="${i}" ><b>${i + 1}</b>${ch.title}<small>${ch.skill}</small></button></li>`).join('')}</ol>
-      <p class="meta">3 stories · about 1 minute each · Pick any story to start</p>
-    </div>`, 'paper');
-  const input = o.querySelector('#name');
-  const begin = (n) => {
-    const v = input.value.trim().replace(/[<>&"]/g, '');
-    if (!v) { input.focus(); input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 500); return; }
-    state.name = v.charAt(0).toUpperCase() + v.slice(1);
-    sfx.pick();
-    closeOverlay().then(() => playChapter(n));
-  };
-  o.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); begin(0); });
-  o.querySelectorAll('[data-ch]').forEach((b) => b.addEventListener('click', () => begin(Number(b.dataset.ch))));
-  if (!input.value) input.focus({ preventScroll: true });
+  onExit(view);
+}
+
+function startStory(n, name, settings) {
+  state.name = name;
+  state.muted = !settings.sound;
+  state.speed = settings.speed;
+  state.journal = store.get().journal ?? [];
+  syncSound();
+  playChapter(n);
+}
+
+function syncSound() {
+  ui.sound.setAttribute('aria-pressed', String(state.muted));
+  ui.sound.textContent = state.muted ? 'Sound off' : 'Sound on';
 }
 
 ui.sound.addEventListener('click', () => {
   state.muted = !state.muted;
-  ui.sound.setAttribute('aria-pressed', String(state.muted));
-  ui.sound.textContent = state.muted ? 'Sound off' : 'Sound on';
+  syncSound();
+  const prog = store.get();
+  prog.settings = { ...(prog.settings ?? {}), sound: !state.muted };
+  store.set(prog);
 });
-$('#menu').addEventListener('click', () => {
-  onAdvance = null;
-  location.reload();
-});
-
-title();
-document.documentElement.dataset.ready = '1';
+$('#menu').addEventListener('click', () => exitStory('home'));

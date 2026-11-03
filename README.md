@@ -1,6 +1,19 @@
 # In Their Shoes
 
-A short story game about empathy. Three stories, about one minute each.
+A social and emotional learning platform built around short empathy stories, about one minute each.
+
+## The platform
+
+| Page | What it does |
+| --- | --- |
+| Home | Dashboard: the next story, progress, today's feeling, skills being practised |
+| Stories | The story library, with status, skill and length |
+| My Journal | Empathy cards from finished stories, plus private notes |
+| Check-in | Daily "How are you feeling?" with a 7-day view and a tip for each feeling |
+| For Teachers | A 15-minute lesson plan, discussion questions, and a printable guide |
+| Settings | Name, sound, text speed (use Fast or Instant when presenting), reset |
+
+## The stories
 
 In each story something happens at school: a groupmate shows up late, a classmate laughs during your talk, a new student ignores you. You react however you want, then you honestly judge them. Then the screen flips and **you live the same moment as that person**. You see what they were going through, and how your own words landed on them. Finally you go back to the moment as yourself and choose again.
 
@@ -31,4 +44,5 @@ Controls: tap or Space to continue, 1/2/3 to choose.
 - `js/story.js`: all the stories and characters, as data. Add a story by adding a chapter.
 - `js/art.js`: faces with nine expressions and the scenes, drawn in SVG
 - `js/game.js`: the story engine
+- `js/shell.js`, `platform.css`: the platform (dashboard and pages)
 - `scripts/playthrough.mjs`: plays the whole game in headless Chrome and takes screenshots (`node scripts/playthrough.mjs --pick=0`)
