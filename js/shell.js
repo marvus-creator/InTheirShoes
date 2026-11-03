@@ -56,7 +56,9 @@ const greeting = () => {
 function renderNav() {
   const p = prog();
   $('#nav').innerHTML = NAV.map(([k, label]) => `<button type="button" class="nav-item ${current === k ? 'on' : ''}" data-view="${k}">${icon(k)}<span>${label}</span></button>`).join('');
-  $('#me').innerHTML = `<span class="avatar">${face(PEOPLE.you, 'happy')}</span><span><b>${esc(p.name ?? '')}</b><small>Student</small></span>`;
+  const a = accounts.current();
+  $('#me').innerHTML = `<span class="avatar">${face(PEOPLE.you, 'happy')}</span><span class="me-text"><b>${esc(a?.name ?? p.name ?? '')}</b><small>${esc(a?.cls || 'Student')}</small></span><button type="button" class="logout" id="logout" title="Log out">Log out</button>`;
+  $('#logout').addEventListener('click', logout);
   $('#nav').querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
 }
 
@@ -77,7 +79,7 @@ function play(n) {
   sfx.pick();
   shell.hidden = true;
   app.hidden = false;
-  startStory(n, p.name, p.settings);
+  startStory(n, accounts.current()?.name ?? p.name, p.settings);
 }
 
 onExit = (k) => {
@@ -250,11 +252,22 @@ const VIEWS = {
   settings() {
     const p = prog();
     const s = p.settings;
+    const acc = accounts.current();
     return `
       <header class="page-head"><div><p class="eyebrow">Preferences</p><h1>Settings</h1></div></header>
       <section class="panel form">
-        <label for="set-name">Your name</label>
-        <div class="note-row"><input id="set-name" maxlength="16" value="${esc(p.name)}"><button class="btn sm" id="save-name">Save</button></div>
+        <div class="acct"><span class="who-face lg">${face(PEOPLE.you, 'happy')}</span><div><h3>${esc(acc.name)}</h3><p class="tip">${esc(acc.cls || 'No class set')} · Account on this device</p></div><button class="btn sm ghost" id="set-logout">Log out</button></div>
+        <div class="su-row">
+          <div><label for="set-name">First name</label><input id="set-name" maxlength="16" value="${esc(acc.name)}"></div>
+          <div><label for="set-class">Class</label><input id="set-class" maxlength="12" value="${esc(acc.cls || '')}" placeholder="e.g. S2 A"></div>
+        </div>
+        <button class="btn sm" id="save-name">Save profile</button>
+        <p class="tip" id="name-msg"></p>
+      </section>
+      <section class="panel form">
+        <label for="set-pin">Change PIN</label>
+        <div class="note-row"><input id="set-pin" type="password" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN"><button class="btn sm" id="save-pin">Update PIN</button></div>
+        <p class="tip" id="pin-msg2"></p>
       </section>
       <section class="panel form">
         <label>Sound</label>
@@ -265,8 +278,8 @@ const VIEWS = {
       </section>
       <section class="panel form danger">
         <label>Start over</label>
-        <p class="tip">Clears stories, journal cards, check-ins and notes on this device.</p>
-        <button class="btn sm ghost" id="reset">Reset all progress</button>
+        <p class="tip">Reset clears your stories, journal, check-ins and notes. Delete removes your whole account from this device.</p>
+        <div class="row-btns"><button class="btn sm ghost" id="reset">Reset my progress</button><button class="btn sm ghost danger-btn" id="delete-acc">Delete my account</button></div>
       </section>
       <p class="about">In Their Shoes · A social and emotional learning platform · Works offline · Nothing is sent anywhere</p>`;
   },
@@ -294,14 +307,35 @@ const BIND = {
     $('#print').addEventListener('click', () => print());
   },
   settings() {
+    const acc = accounts.current();
+    $('#set-logout').addEventListener('click', logout);
     $('#save-name').addEventListener('click', () => {
       const v = cleanName($('#set-name').value);
       if (!v) return $('#set-name').focus();
+      const cls = $('#set-class').value.trim().replace(/[<>&"]/g, '').slice(0, 12);
+      accounts.update(acc.id, { name: v, cls });
       const p = prog();
       p.name = v;
       save(p);
       sfx.pick();
       go('settings');
+      $('#name-msg').textContent = 'Saved.';
+    });
+    $('#save-pin').addEventListener('click', async () => {
+      const v = $('#set-pin').value.trim();
+      const m = $('#pin-msg2');
+      if (!/^\d{4}$/.test(v)) { m.textContent = 'Your PIN must be exactly 4 numbers.'; return; }
+      if (/^(\d)\1{3}$/.test(v) || v === '1234') { m.textContent = 'That PIN is too easy to guess.'; return; }
+      accounts.update(acc.id, { pin: await hashPin(acc.id, v) });
+      $('#set-pin').value = '';
+      sfx.card();
+      m.textContent = 'PIN updated.';
+    });
+    $('#delete-acc').addEventListener('click', () => {
+      if (!confirm(`Delete ${acc.name}'s account and everything in it from this device?`)) return;
+      accounts.save(accounts.all().filter((a) => a.id !== acc.id));
+      try { localStorage.removeItem(store.key()); } catch {}
+      logout();
     });
     for (const [id, key] of [['#set-sound', 'sound'], ['#set-speed', 'speed']]) {
       $(id).querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
@@ -327,38 +361,14 @@ function cleanName(v) {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
 }
 
-function onboard() {
-  shell.hidden = true;
-  app.hidden = false;
-  ui.hud.hidden = true;
-  setScene('home', '', '');
-  const o = overlay(`
-    <div class="start">
-      <div class="faces">${['eric', 'grace', 'kevin'].map((id, i) => `<span style="--i:${i};--c:${PEOPLE[id].color}">${face(PEOPLE[id], ['tired', 'laugh', 'worried'][i])}</span>`).join('')}</div>
-      <p class="eyebrow">A social and emotional learning platform</p>
-      <h1>In Their Shoes</h1>
-      <p class="sub">Short stories where you see a moment at school from the other person’s side. Plus a daily check-in and a private journal.</p>
-      <form class="name">
-        <label for="name">What should we call you?</label>
-        <div class="row"><input id="name" maxlength="16" autocomplete="off" placeholder="Your first name" required><button class="btn">Get started</button></div>
-      </form>
-      <p class="meta">Works offline · Nothing leaves this device</p>
-    </div>`, 'paper');
-  const input = o.querySelector('#name');
-  input.focus({ preventScroll: true });
-  o.querySelector('form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const v = cleanName(input.value);
-    if (!v) { input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 500); return; }
-    const p = prog();
-    p.name = v;
-    save(p);
-    sfx.pick();
-    closeOverlay().then(() => { app.hidden = true; shell.hidden = false; go('home'); });
-  });
+function enterApp() {
+  const p = prog();
+  state.muted = !p.settings.sound;
+  app.hidden = true;
+  shell.hidden = false;
+  go('home');
 }
 
-const boot = prog();
-state.muted = !boot.settings.sound;
-if (boot.name) { app.hidden = true; go('home'); } else onboard();
+const resumed = accounts.current();
+if (resumed) { applyAccount(resumed); authRoot.hidden = true; enterApp(); } else showAuth();
 document.documentElement.dataset.ready = '1';

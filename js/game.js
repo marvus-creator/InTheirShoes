@@ -9,11 +9,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const store = {
+  id: null,
+  key() {
+    return `its:progress:${this.id ?? 'guest'}`;
+  },
   get() {
-    try { return JSON.parse(localStorage.getItem('its:progress') || '{}'); } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem(this.key()) || '{}'); } catch { return {}; }
   },
   set(v) {
-    try { localStorage.setItem('its:progress', JSON.stringify(v)); } catch {}
+    try { localStorage.setItem(this.key(), JSON.stringify(v)); } catch {}
   },
 };
 

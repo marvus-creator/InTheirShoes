@@ -4,6 +4,9 @@ A social and emotional learning platform built around short empathy stories, abo
 
 ## The platform
 
+**Sign in.** Several students can share one school computer. Each creates an account with their name, class, a 4-digit PIN and their own character (skin tone and hair), who then appears in the stories as "you". Each student's stories, journal and check-ins are separate. PINs are stored hashed (SHA-256), easy PINs like 1111 or 1234 are refused, and 5 wrong tries lock the account for 30 seconds. Everything stays on the device: this is a classroom login, not a server account.
+
+
 | Page | What it does |
 | --- | --- |
 | Home | Dashboard: the next story, progress, today's feeling, skills being practised |
@@ -45,4 +48,5 @@ Controls: tap or Space to continue, 1/2/3 to choose.
 - `js/art.js`: faces with nine expressions and the scenes, drawn in SVG
 - `js/game.js`: the story engine
 - `js/shell.js`, `platform.css`: the platform (dashboard and pages)
+- `js/auth.js`, `auth.css`: accounts, PIN sign-in and character creator
 - `scripts/playthrough.mjs`: plays the whole game in headless Chrome and takes screenshots (`node scripts/playthrough.mjs --pick=0`)
