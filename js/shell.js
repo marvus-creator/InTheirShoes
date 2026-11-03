@@ -21,13 +21,153 @@ const NAV = [
 ];
 
 const MOODS_LIST = [
-  { id: 'happy', label: 'Happy', who: 'grace', tip: 'Great! Who could you share some of that energy with today?' },
-  { id: 'neutral', label: 'Okay', who: 'eric', tip: 'Okay is fine. Notice one small good thing before the day ends.' },
-  { id: 'tired', label: 'Tired', who: 'eric', tip: 'Your body is asking for rest. Water, a short break, and sleep tonight.' },
-  { id: 'worried', label: 'Worried', who: 'kevin', tip: 'Name the worry. Then tell one person you trust about it.' },
-  { id: 'sad', label: 'Sad', who: 'kevin', tip: 'It’s okay to feel sad. Who is someone you could sit with today?' },
-  { id: 'angry', label: 'Angry', who: 'diane', tip: 'Breathe in for 4, out for 6. Decide what to do after the wave passes.' },
+  { id: 'happy', label: 'Happy', who: 'grace', tip: 'Great! Who could you share some of that energy with today?', title: 'Love that!', msg: 'Happy days are worth noticing. What made today good?', actions: ['write', 'spread', 'story'], story: 'late' },
+  { id: 'neutral', label: 'Okay', who: 'eric', tip: 'Okay is fine. Notice one small good thing before the day ends.', title: 'Okay is okay.', msg: 'Not every day needs to be amazing. Want to look for one small good thing?', actions: ['write', 'breathe', 'story'], story: 'quiet' },
+  { id: 'tired', label: 'Tired', who: 'eric', tip: 'Your body is asking for rest. Water, a short break, and sleep tonight.', title: 'Thanks for noticing.', msg: 'Being tired makes everything feel harder. Your body is asking for care.', actions: ['breathe', 'rest', 'write'], story: 'late' },
+  { id: 'worried', label: 'Worried', who: 'kevin', tip: 'Name the worry. Then tell one person you trust about it.', title: 'Worries feel smaller when shared.', msg: 'You don’t have to carry it alone. Let’s slow down first.', actions: ['breathe', 'talk', 'write', 'story'], story: 'quiet', serious: true },
+  { id: 'sad', label: 'Sad', who: 'kevin', tip: 'It’s okay to feel sad. Who is someone you could sit with today?', title: 'I’m sorry you feel sad.', msg: 'Sad is a real feeling, and it’s allowed. Here are some things that can help a little.', actions: ['talk', 'write', 'breathe', 'story'], story: 'quiet', serious: true },
+  { id: 'angry', label: 'Angry', who: 'diane', tip: 'Breathe in for 4, out for 6. Decide what to do after the wave passes.', title: 'Anger is a signal.', msg: 'It tells you something matters. Let the wave pass before you decide what to do.', actions: ['breathe', 'write', 'talk', 'story'], story: 'laugh', serious: true },
 ];
+
+const REASONS = ['Friends', 'School work', 'Family', 'Home', 'Health', 'Not sure'];
+
+const ACTIONS = {
+  breathe: { title: 'Breathe with me', sub: '1 minute calm-down', ico: 'checkin' },
+  write: { title: 'Write it down', sub: 'Private note in your journal', ico: 'journal' },
+  talk: { title: 'Talk to someone', sub: 'Who and how to start', ico: 'teachers' },
+  story: { title: 'A story that helps', sub: '1 minute', ico: 'stories' },
+  spread: { title: 'Spread it', sub: 'Make someone else’s day', ico: 'home' },
+  rest: { title: 'Quick reset', sub: '3 small things for your body', ico: 'clock' },
+};
+
+const modal = $('#modal');
+let breathTimer = null;
+
+function closeModal() {
+  clearTimeout(breathTimer);
+  modal.hidden = true;
+  modal.innerHTML = '';
+  if (current === 'home' || current === 'checkin' || current === 'journal') go(current);
+}
+
+function openModal(html) {
+  clearTimeout(breathTimer);
+  modal.hidden = false;
+  modal.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true"><button type="button" class="modal-x" aria-label="Close">\u00D7</button>${html}</div>`;
+  modal.querySelector('.modal-x').addEventListener('click', closeModal);
+  modal.querySelector('.modal-card').focus?.();
+}
+
+modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+
+function support(moodId) {
+  const m = MOODS_LIST.find((x) => x.id === moodId);
+  const who = PEOPLE.you;
+  const entry = prog().checkins.find((c) => c.date === today());
+  openModal(`
+    <div class="sup-head" style="--c:${PEOPLE[m.who].color}">
+      <span class="sup-face">${face(who, m.id)}</span>
+      <div><p class="eyebrow">You feel ${m.label.toLowerCase()}</p><h2>${m.title}</h2><p class="sup-msg">${m.msg}</p></div>
+    </div>
+    <p class="sup-q">What is it about? <small>(optional, only you see this)</small></p>
+    <div class="reasons">${REASONS.map((r) => `<button type="button" data-reason="${r}" class="${entry?.reason === r ? 'on' : ''}">${r}</button>`).join('')}</div>
+    <div class="acts">${m.actions.map((a) => `<button type="button" class="act" data-act="${a}">${icon(ACTIONS[a].ico)}<span><b>${ACTIONS[a].title}</b><small>${a === 'story' ? `${CHAPTERS.find((c) => c.id === m.story).title} \u00B7 ${ACTIONS[a].sub}` : ACTIONS[a].sub}</small></span></button>`).join('')}</div>
+    ${m.serious ? '<p class="care">If this feeling stays for many days, or you feel unsafe, talk to your teacher or the school counsellor. You don\u2019t have to handle it alone.</p>' : ''}
+    <button type="button" class="btn sm ghost sup-done">I\u2019m okay for now</button>`);
+  modal.querySelectorAll('[data-reason]').forEach((b) => b.addEventListener('click', () => {
+    const p = prog();
+    const c = p.checkins.find((x) => x.date === today());
+    if (c) c.reason = c.reason === b.dataset.reason ? undefined : b.dataset.reason;
+    save(p);
+    sfx.tick();
+    modal.querySelectorAll('[data-reason]').forEach((x) => x.classList.toggle('on', x === b && c?.reason === b.dataset.reason));
+  }));
+  modal.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => { sfx.pick(); runAction(b.dataset.act, m); }));
+  modal.querySelector('.sup-done').addEventListener('click', closeModal);
+}
+
+function backTo(m) {
+  return `<button type="button" class="back" data-back>\u2190 Back</button>`;
+}
+
+function bindBack(m) {
+  modal.querySelector('[data-back]').addEventListener('click', () => support(m.id));
+}
+
+function runAction(a, m) {
+  if (a === 'story') {
+    modal.hidden = true;
+    modal.innerHTML = '';
+    return play(CHAPTERS.findIndex((c) => c.id === m.story));
+  }
+  if (a === 'breathe') return breathe(m);
+  if (a === 'write') {
+    openModal(`${backTo(m)}<h2>Write it down</h2><p class="sup-msg">Putting a feeling into words makes it easier to handle. This stays private on this device.</p>
+      <textarea id="m-note" rows="4" maxlength="300" placeholder="${m.id === 'happy' || m.id === 'neutral' ? 'One good thing today was\u2026' : 'Right now I feel ' + m.label.toLowerCase() + ' because\u2026'}"></textarea>
+      <div class="row-btns"><button class="btn sm" id="m-save">Save to my journal</button></div><p class="tip" id="m-msg"></p>`);
+    bindBack(m);
+    modal.querySelector('#m-note').focus();
+    modal.querySelector('#m-save').addEventListener('click', () => {
+      const t = modal.querySelector('#m-note').value.trim();
+      if (!t) return modal.querySelector('#m-note').focus();
+      const p = prog();
+      p.notes.push({ at: Date.now(), text: t.slice(0, 300), mood: m.id });
+      save(p);
+      sfx.card();
+      openModal(`<div class="sup-ok"><span class="sup-face">${face(PEOPLE.you, 'happy')}</span><h2>Saved.</h2><p class="sup-msg">You named it and wrote it down. That takes courage.</p><div class="row-btns"><button class="btn sm" data-goto="journal">Open my journal</button><button class="btn sm ghost" data-close>Done</button></div></div>`);
+      modal.querySelector('[data-goto]').addEventListener('click', () => { modal.hidden = true; modal.innerHTML = ''; go('journal'); });
+      modal.querySelector('[data-close]').addEventListener('click', closeModal);
+    });
+    return;
+  }
+  const LISTS = {
+    talk: ['Pick one person: a friend, a family member, your class teacher, or the school counsellor.', 'Start simple: \u201CCan I talk to you for a minute? I\u2019m feeling ' + m.label.toLowerCase() + '.\u201D', 'You don\u2019t need the perfect words. Saying it out loud is enough to begin.'],
+    spread: ['Tell someone one thing you appreciate about them.', 'Invite someone who is alone to join you.', 'Say thank you to a teacher or a cook today.'],
+    rest: ['Drink a glass of water.', 'Stand up, stretch your arms high, and roll your shoulders.', 'Plan to sleep a little earlier tonight.'],
+  };
+  const t = { talk: 'Talk to someone', spread: 'Spread it', rest: 'Quick reset' }[a];
+  openModal(`${backTo(m)}<h2>${t}</h2><ol class="tips">${LISTS[a].map((x) => `<li>${x}</li>`).join('')}</ol><button class="btn sm" data-close>Got it</button>`);
+  bindBack(m);
+  modal.querySelector('[data-close]').addEventListener('click', closeModal);
+}
+
+function breathe(m) {
+  openModal(`${backTo(m)}<div class="breath"><h2>Breathe with me</h2><p class="sup-msg">Follow the circle. Three slow breaths.</p>
+    <div class="ring"><div class="orb" id="orb"></div><span id="breath-word">Get ready</span></div>
+    <p class="breath-count" id="breath-count">Breath 1 of 3</p><button class="btn sm ghost" data-close>Stop</button></div>`);
+  bindBack(m);
+  modal.querySelector('[data-close]').addEventListener('click', closeModal);
+  const orb = modal.querySelector('#orb');
+  const word = modal.querySelector('#breath-word');
+  const count = modal.querySelector('#breath-count');
+  const steps = [['Breathe in', 4000, 'in'], ['Hold', 2000, 'hold'], ['Breathe out', 6000, 'out']];
+  let round = 0;
+  let i = 0;
+  const tick = () => {
+    if (modal.hidden || !modal.contains(orb)) return;
+    if (i === steps.length) { i = 0; round += 1; }
+    if (round === 3) {
+      sfx.card();
+      word.textContent = 'Well done';
+      orb.className = 'orb';
+      count.textContent = 'How do you feel now?';
+      const btn = modal.querySelector('[data-close]');
+      btn.textContent = 'Done';
+      btn.classList.remove('ghost');
+      return;
+    }
+    const [label, ms, cls] = steps[i];
+    word.textContent = label;
+    orb.style.transitionDuration = `${ms}ms`;
+    orb.className = `orb ${cls}`;
+    count.textContent = `Breath ${round + 1} of 3`;
+    if (cls !== 'hold') tone(cls === 'in' ? 392 : 330, 0.5, 'sine', 0.025);
+    i += 1;
+    breathTimer = setTimeout(tick, reduced ? 300 : ms);
+  };
+  breathTimer = setTimeout(tick, reduced ? 100 : 900);
+}
 
 const shell = $('#shell');
 const view = $('#view');
@@ -75,6 +215,9 @@ function go(k) {
 }
 
 function play(n) {
+  clearTimeout(breathTimer);
+  modal.hidden = true;
+  modal.innerHTML = '';
   const p = prog();
   sfx.pick();
   shell.hidden = true;
@@ -133,6 +276,7 @@ function bindMood(after) {
     save(p);
     sfx.pick();
     after(b.dataset.mood);
+    support(b.dataset.mood);
   }));
 }
 
@@ -147,8 +291,10 @@ const VIEWS = {
     const weekCount = p.checkins.filter((c) => (Date.now() - new Date(`${c.date}T12:00:00`)) / 864e5 < 7).length;
     const latest = p.journal.at(-1);
     return `
-      <header class="page-head">
-        <div><p class="eyebrow">${longDate()}</p><h1>${greeting()}, ${esc(p.name)}.</h1></div>
+      <header class="page-head home-head">
+        <span class="home-me">${face(PEOPLE.you, todayMood ?? 'happy')}</span>
+        <div class="home-hi"><p class="eyebrow">${longDate()}</p><h1>${greeting()}, ${esc(accounts.current()?.name ?? p.name)}.</h1></div>
+        <button type="button" class="pill-btn" data-go="settings">${icon('settings')}<span>${esc(accounts.current()?.cls || 'My profile')}</span></button>
       </header>
       <section class="hero" style="--c:${np.color}">
         <div class="hero-text">
@@ -160,7 +306,7 @@ const VIEWS = {
             ${next >= 0 ? `<span class="skill-tag">${nc.skill}</span>` : ''}
           </div>
         </div>
-        <div class="hero-face">${face(np, next >= 0 ? 'worried' : 'happy')}</div>
+        <figure class="hero-char"><div class="hero-face">${face(np, next >= 0 ? 'worried' : 'happy')}</div><figcaption>${next >= 0 ? `Meet ${np.name}` : 'All done'}</figcaption></figure>
       </section>
       <section class="stats">
         <div class="stat"><b>${done.size}<small>/${CHAPTERS.length}</small></b><span>Stories completed</span><i style="--w:${(done.size / CHAPTERS.length) * 100}%"></i></div>
@@ -210,7 +356,7 @@ const VIEWS = {
         <h3>In real life you can’t switch shoes. But you can ask.</h3>
         <label for="note">Who might need a second look from you this week?</label>
         <div class="note-row"><textarea id="note" rows="2" maxlength="300" placeholder="Someone I could ask…"></textarea><button class="btn sm" id="save-note">Save note</button></div>
-        <ul class="note-list">${p.notes.slice().reverse().map((n) => `<li><small>${new Date(n.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</small>${esc(n.text)}</li>`).join('')}</ul>
+        <ul class="note-list">${p.notes.slice().reverse().map((n) => `<li><small>${new Date(n.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${n.mood ? ` \u00B7 felt ${MOODS_LIST.find((m) => m.id === n.mood)?.label.toLowerCase() ?? ''}` : ''}</small>${esc(n.text)}</li>`).join('')}</ul>
       </section>`;
   },
   checkin() {

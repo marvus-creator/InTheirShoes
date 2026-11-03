@@ -12,7 +12,7 @@ A social and emotional learning platform built around short empathy stories, abo
 | Home | Dashboard: the next story, progress, today's feeling, skills being practised |
 | Stories | The story library, with status, skill and length |
 | My Journal | Empathy cards from finished stories, plus private notes |
-| Check-in | Daily "How are you feeling?" with a 7-day view and a tip for each feeling |
+| Check-in | Daily "How are you feeling?". Picking a feeling opens a support panel: what it's about (optional), a guided breathing exercise, write it down, who to talk to, and a story that helps. Sad, worried or angry adds a gentle pointer to a teacher or the school counsellor. 7-day view. |
 | For Teachers | A 15-minute lesson plan, discussion questions, and a printable guide |
 | Settings | Name, sound, text speed (use Fast or Instant when presenting), reset |
 
@@ -49,4 +49,5 @@ Controls: tap or Space to continue, 1/2/3 to choose.
 - `js/game.js`: the story engine
 - `js/shell.js`, `platform.css`: the platform (dashboard and pages)
 - `js/auth.js`, `auth.css`: accounts, PIN sign-in and character creator
+- `care.css`: the feelings support panel and breathing exercise
 - `scripts/playthrough.mjs`: plays the whole game in headless Chrome and takes screenshots (`node scripts/playthrough.mjs --pick=0`)
