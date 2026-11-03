@@ -1,6 +1,6 @@
 # In Their Shoes
 
-A short story game about empathy. About 10 minutes, three stories.
+A short story game about empathy. Three stories, about one minute each.
 
 In each story something happens at school: a groupmate shows up late, a classmate laughs during your talk, a new student ignores you. You react however you want, then you honestly judge them. Then the screen flips and **you live the same moment as that person**. You see what they were going through, and how your own words landed on them. Finally you go back to the moment as yourself and choose again.
 

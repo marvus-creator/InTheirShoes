@@ -182,7 +182,7 @@ async function line(kind, who, raw) {
   let done = false;
   await new Promise((res) => {
     let i = 0;
-    const speed = reduced ? 0 : 22;
+    const speed = reduced ? 0 : 11;
     onAdvance = () => { done = true; };
     const tick = () => {
       if (done || speed === 0) i = full.length;
@@ -190,7 +190,7 @@ async function line(kind, who, raw) {
       if (i >= full.length) return res();
       if (i % 3 === 0) sfx.tick();
       i += 1;
-      setTimeout(tick, full[i - 1] === '.' || full[i - 1] === '?' ? speed * 6 : speed);
+      setTimeout(tick, full[i - 1] === '.' || full[i - 1] === '?' ? speed * 3 : speed);
     };
     tick();
   });
@@ -376,18 +376,7 @@ async function playChapter(n) {
   prog.journal = state.journal;
   prog.name = state.name;
   store.set(prog);
-  if (n + 1 < CHAPTERS.length) {
-    const o = overlay(`
-      <div class="title-card">
-        <p class="eyebrow">Story complete</p>
-        <h1>${ch.title}</h1>
-        <p class="sub">Journal card added: ${ch.skill}</p>
-        <button class="btn" data-go>Next story</button>
-      </div>`, 'dark');
-    await waitButton(o);
-    await closeOverlay();
-    return playChapter(n + 1);
-  }
+  if (n + 1 < CHAPTERS.length) return playChapter(n + 1);
   finale();
 }
 
@@ -454,8 +443,8 @@ function title() {
         <label for="name">What should we call you?</label>
         <div class="row"><input id="name" maxlength="16" autocomplete="off" placeholder="Your first name" value="${(prog.name ?? '').replace(/"/g, '')}" required><button class="btn">Start</button></div>
       </form>
-      <ol class="chapters">${CHAPTERS.map((ch, i) => `<li class="${done.has(ch.id) ? 'done' : ''}"><button type="button" data-ch="${i}" ${i === 0 || done.has(CHAPTERS[i - 1].id) ? '' : 'disabled'}><b>${i + 1}</b>${ch.title}<small>${ch.skill}</small></button></li>`).join('')}</ol>
-      <p class="meta">About 10 minutes · Headphones on for sound</p>
+      <ol class="chapters">${CHAPTERS.map((ch, i) => `<li class="${done.has(ch.id) ? 'done' : ''}"><button type="button" data-ch="${i}" ><b>${i + 1}</b>${ch.title}<small>${ch.skill}</small></button></li>`).join('')}</ol>
+      <p class="meta">3 stories · about 1 minute each · Pick any story to start</p>
     </div>`, 'paper');
   const input = o.querySelector('#name');
   const begin = (n) => {
